@@ -19,67 +19,76 @@ type Sample struct {
 	Occupancy         int       `json:"occupancy"`
 	Battery           float64   `json:"battery"`
 	Vacancy           int       `json:"vacancy"`
+	Message           string    `json:"message"`
+	Sequence          int       `json:"sequence"`
 }
 
 // ParseSensorReport attempts to parse a block of data, for example from a serial port, into a Sample record
-func ParseSensorReport(input []byte) (sample Sample, err error) {
+func ParseSensorReport(input []byte) (output map[string]interface{}, err error) {
 	var d map[string]interface{}
+	// var output map[string]interface{}
+
+	output = make(map[string]interface{})
 
 	// Timestamp is now
-	sample.Timestamp = time.Now()
+	output["timestamp"] = time.Now()
 
 	// Stringify the byte array.
 	str := strings.TrimSpace(string(input))
+	output["message"] = str
 
 	// If the line isn't actually a JSON response, just return invalid.
 	if strings.HasPrefix(str, `{"@"`) == false {
-		return sample, fmt.Errorf("Not a valid sensor report")
+		return output, fmt.Errorf("Not a valid sensor report")
 	}
 
 	// First try to turn the passed-in data from JSON to an object.
 	if err := json.Unmarshal(input, &d); err != nil {
-		return sample, fmt.Errorf("could not parse json.")
+		return output, fmt.Errorf("could not parse json")
 	}
 
 	// Try to fill the sample with data.
-
 	if _, ok := d["@"]; ok {
-		sample.Device = d["@"].(string)
+		output["device"] = d["@"].(string)
 	} else {
-		return sample, fmt.Errorf("Record does not contain a device ID field '@'.")
+		return output, fmt.Errorf("record does not contain a device ID field '@'")
+	}
+
+	if _, ok := d["+"]; ok {
+		output["sequence"] = int(d["+"].(float64))
 	}
 
 	if _, ok := d["B|cV"]; ok {
-		sample.Battery = d["B|cV"].(float64) / 100
+		output["battery"] = d["B|cV"].(float64) / 100
 	}
 
 	if _, ok := d["H|%"]; ok {
-		sample.Humidity = int(d["H|%"].(float64))
+		output["humidity"] = int(d["H|%"].(float64))
 	}
 
 	if _, ok := d["L"]; ok {
-		sample.Light = int(d["L"].(float64))
+		output["light"] = int(d["L"].(float64))
 	}
 
 	if _, ok := d["tT|C"]; ok {
-		sample.TargetTemperature = int(d["tT|C"].(float64))
+		output["target_temperature"] = int(d["tT|C"].(float64))
 	}
 
 	if _, ok := d["T|C16"]; ok {
-		sample.Temperature = d["T|C16"].(float64) / 16
+		output["temperature"] = d["T|C16"].(float64) / 16
 	}
 
 	if _, ok := d["O"]; ok {
-		sample.Occupancy = int(d["O"].(float64))
+		output["occupancy"] = int(d["O"].(float64))
 	}
 
 	if _, ok := d["vac|h"]; ok {
-		sample.Vacancy = int(d["vac|h"].(float64))
+		output["vacancy"] = int(d["vac|h"].(float64))
 	}
 
 	if _, ok := d["v|%"]; ok {
-		sample.Valve = int(d["v|%"].(float64))
+		output["valve"] = int(d["v|%"].(float64))
 	}
 
-	return sample, nil
+	return output, nil
 }
